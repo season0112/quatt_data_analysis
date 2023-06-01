@@ -3,10 +3,9 @@ This Python file is made to the difference between measurements of internal and 
 It will run the pump at different powers for a certain amount of time.
 '''
 
-from QuattRedis import QuattRedis, datatype
-import numpy as np
+from QuattRedis import QuattRedis
 import time
-import pandas as pd
+import csv
 
 # define redis adresses
 CONTROLLER_FLAG_ADRESS = '9008'
@@ -19,8 +18,10 @@ GET_PUMP_DUTY_CYCLE_ADRESS = '186'
 
 def main():
 
-    df = pd.DataFrame(columns=['time', 'set_pump_duty_cycle', 'get_pump_duty_cycle', 'internal_flow', 'external_flow'])
-
+    # set pump duty cycles
+    results = []
+    field_names = ['time', 'set_pump_duty_cycle', 'get_pump_duty_cycle', 'internal_flow', 'external_flow']
+    set_pump_duty_cycles = [100, 250, 400, 550, 700, 850]
 
     redis = QuattRedis()
     redis.connect()
@@ -30,9 +31,6 @@ def main():
 
     # switch on pump relay
     redis.mset({PUMP_RELAY_ADRESS:1})
-
-    # set pump duty cycles
-    set_pump_duty_cycles = [100, 250, 400, 550, 700, 850]
 
     for set_pump_duty_cycle in set_pump_duty_cycles:
         
@@ -48,17 +46,21 @@ def main():
             external_measurement = redis.get(EXTERNAL_FLOW_METER_ADRESS) # still needs to be set up
 
             #add measurements to pandas frame
-            df = df.append({'time':time.time(),
-                            'set_pump_duty_cycle':set_pump_duty_cycle,
-                            'get_pump_duty_cycle':get_pump_duty_cycle,
-                            'internal_flow':internal_measurement, 
-                            'external_flow':external_measurement}, ignore_index=True)
-            
+            measurements = {
+                'time':time.time(),
+                'set_pump_duty_cycle':set_pump_duty_cycle,
+                'get_pump_duty_cycle':get_pump_duty_cycle,
+                'internal_flow':internal_measurement,
+                'external_flow':external_measurement
+                }
+            results.append(measurements)
             time.sleep(5) # wait 5 seconds between measurements
     
     # save dataframe to csv
-    df.to_csv(f'data/flow_meter_test_{int(time.time())}.csv', index=False)
-
+    with open(f'data/flow_meter_test_{int(time.time())}.csv', 'w') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=field_names)
+        writer.writeheader()
+        writer.writerows(results)
 
 if __name__=='__main__':
     # run script
