@@ -13,12 +13,13 @@ CONTROLLER_FLAG_ADRESS = '9008'
 INTERNAL_FLOW_METER_ADRESS = '31'
 EXTERNAL_FLOW_METER_ADRESS = '30030'
 PUMP_RELAY_ADRESS = '103'
-PUMP_DUTY_CYCLE_ADRESS = '104'
+SET_PUMP_DUTY_CYCLE_ADRESS = '104'
+GET_PUMP_DUTY_CYCLE_ADRESS = '186'
 
 
 def main():
 
-    df = pd.DataFrame(columns=['time', 'pump_duty_cycle', 'internal_flow', 'external_flow'])
+    df = pd.DataFrame(columns=['time', 'set_pump_duty_cycle', 'get_pump_duty_cycle', 'internal_flow', 'external_flow'])
 
 
     redis = QuattRedis()
@@ -31,23 +32,25 @@ def main():
     redis.mset({PUMP_RELAY_ADRESS:1})
 
     # set pump duty cycles
-    pump_duty_cycles = [100, 250, 400, 550, 700, 850]
+    set_pump_duty_cycles = [100, 250, 400, 550, 700, 850]
 
-    for pump_duty_cycle in pump_duty_cycles:
+    for set_pump_duty_cycle in set_pump_duty_cycles:
         
         # set pump duty cycle
-        redis.mset({PUMP_DUTY_CYCLE_ADRESS:pump_duty_cycle})
+        redis.mset({SET_PUMP_DUTY_CYCLE_ADRESS:set_pump_duty_cycle})
         time.sleep(30) # wait 30 seconds to reach steady state
 
         # take measurements
         for _ in range(10):
             # take measurements
+            get_pump_duty_cycle = redis.get(GET_PUMP_DUTY_CYCLE_ADRESS) # get pump duty cycle from redis
             internal_measurement = redis.get(INTERNAL_FLOW_METER_ADRESS)
             external_measurement = redis.get(EXTERNAL_FLOW_METER_ADRESS) # still needs to be set up
 
             #add measurements to pandas frame
             df = df.append({'time':time.time(),
-                            'pump_duty_cycle':pump_duty_cycle, 
+                            'set_pump_duty_cycle':set_pump_duty_cycle,
+                            'get_pump_duty_cycle':get_pump_duty_cycle,
                             'internal_flow':internal_measurement, 
                             'external_flow':external_measurement}, ignore_index=True)
             
