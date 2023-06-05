@@ -58,7 +58,6 @@ def main():
     # switch off pump & pump relay & controller adress
     redis.mset({SET_PUMP_DUTY_CYCLE_ADRESS:0})
     redis.mset({PUMP_RELAY_ADRESS:0})
-    redis.mset({CONTROLLER_FLAG_ADRESS:0})
     
     # save dataframe to csv
     print(f'Saving results to data/flow_meter_test_{int(time.time())}.csv')
