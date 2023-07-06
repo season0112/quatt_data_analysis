@@ -1,0 +1,6 @@
+{
+    "modbus_port": "/dev/ttyS3",
+    "password": null,
+    "sampling_time": 1,
+    "log_level": "WARNING"
+}
