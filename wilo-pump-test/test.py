@@ -17,8 +17,8 @@ PUMP_2_RELAY_ADRESS = '203'
 SET_PUMP_2_DUTY_CYCLE_ADRESS = '204'
 GET_PUMP_2_DUTY_CYCLE_ADRESS = '286'
 
-CONFIG = [{'name': 'Wilo', 'relay-address': PUMP_1_RELAY_ADRESS, 'set-duty-cycle': SET_PUMP_1_DUTY_CYCLE_ADRESS, 'power-feedback': GET_PUMP_1_DUTY_CYCLE_ADRESS}, 
-          {'name': 'AWMT', 'relay-address': PUMP_2_RELAY_ADRESS, 'set-duty-cycle': SET_PUMP_2_DUTY_CYCLE_ADRESS, 'power-feedback': GET_PUMP_2_DUTY_CYCLE_ADRESS}]
+CONFIG = [{'name': 'AWMT', 'relay-address': PUMP_1_RELAY_ADRESS, 'set-duty-cycle': SET_PUMP_1_DUTY_CYCLE_ADRESS, 'power-feedback': GET_PUMP_1_DUTY_CYCLE_ADRESS},
+          {'name': 'Wilo', 'relay-address': PUMP_2_RELAY_ADRESS, 'set-duty-cycle': SET_PUMP_2_DUTY_CYCLE_ADRESS, 'power-feedback': GET_PUMP_2_DUTY_CYCLE_ADRESS}]
 
 
 def main():
@@ -51,8 +51,8 @@ def main():
             redis.mset({pump['set-duty-cycle']: duty_cycle})
             #time.sleep(60) # Taking out waiting time, and analyzing the data afterwards
 
-            # take measurements for 10*2 seconds = 20 seconds
-            for _ in range(10):
+            # take measurements for 30*1 seconds = 30 seconds
+            for _ in range(30):
                 # take measurements
                 get_pump_duty_cycle = redis.get(pump['power-feedback']) # get pump duty cycle from redis
                 flow = redis.get(FLOW_METER_ADRESS)
@@ -66,7 +66,7 @@ def main():
                     'measured_flow':flow
                     }
                 results.append(measurements)
-                time.sleep(2) # wait 5 seconds between measurements
+                time.sleep(1) # wait 5 seconds between measurements
         
         # Switch off pump relay
         redis.mset({pump['relay-address']: 0})
