@@ -21,5 +21,6 @@ CREATE TABLE IF NOT EXISTS `cic_data` (
     `OLD_hp2_thermal_energy_counter` DECIMAL(14,6),
     `OLD_cv_energy_counter` DECIMAL(14,6) NOT NULL,
     `number_of_rows` INT NOT NULL,
+    `quattBuild` CHAR(40),
     PRIMARY KEY (`id`)
 );
