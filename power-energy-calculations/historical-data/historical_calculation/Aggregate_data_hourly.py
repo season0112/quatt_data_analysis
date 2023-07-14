@@ -234,7 +234,7 @@ def estimate_energy_consumption(modelInput,
             + (crankcaseHeater * 40))
 
 def integrate_data(df, keys):
-    df['timediff[S]'] = df.groupby('system.quattId',
+    df['timediff[S]'] = df.groupby('cic_id',
                                    sort='time.ts')['time.ts'].diff()/1000
 
     for key, value in zip(keys.keys(), keys.values()):
@@ -250,9 +250,9 @@ def aggregate_data_hourly(df, aggregations):
     '''Aggregate dataframe cic and hour creating a new dataframe.'''
 
     # check input frame
-    if ('time.ts' not in df.columns) | ('system.quattId' not in df.columns):
-        logger.error('time.ts or system.quattId not in dataframe')
-        raise ValueError('time.ts or system.quattId not in dataframe')
+    if ('time.ts' not in df.columns) | ('cic_id' not in df.columns):
+        logger.error('time.ts or cic_id not in dataframe')
+        raise ValueError('time.ts or cic_id not in dataframe')
     
     # create time stamps
     df['timestamp_of_data'] = pd.to_datetime(df['time.ts'],
@@ -458,8 +458,8 @@ if __name__ == "__main__":
     # start_date = sys.argv[2]
     # end_date = sys.argv[3]
 
-    cic_id = "CIC-691989e5-24b7-59b9-9807-537c89035f25"
-    start_date = "2023-03-08"
-    end_date = "2023-03-09"
+    cic_id = "CIC-17fcd27d-dbd7-561c-887e-faf59bb9ebeb"
+    start_date = "2023-03-11"
+    end_date = "2023-03-12"
 
     main(cic_id, start_date, end_date)
