@@ -234,8 +234,10 @@ def estimate_energy_consumption(modelInput,
             + (crankcaseHeater * 40))
 
 def integrate_data(df, keys):
-    df['timediff[S]'] = df.groupby('cic_id',
-                                   sort='time.ts')['time.ts'].diff()/1000
+    df['timediff[S]'] = (df.sort_values(['cic_id','time.ts'])
+                         .groupby('cic_id')['time.ts']
+                         .diff()/1000
+    )
 
     for key, value in zip(keys.keys(), keys.values()):
         try:
@@ -432,7 +434,9 @@ def main(cic_id, start_date, end_date):
         return
     else:
         # de-duplicate dataframe
-        extract_df = extract_df[~extract_df.index.duplicated(keep='first')]
+        extract_df = extract_df.drop_duplicates(subset=['time.ts'], keep='first')
+        
+        #[~extract_df.index.duplicated(keep='first')]
 
     # calculate and aggregate data
     try:
@@ -458,8 +462,8 @@ if __name__ == "__main__":
     # start_date = sys.argv[2]
     # end_date = sys.argv[3]
 
-    cic_id = "CIC-17fcd27d-dbd7-561c-887e-faf59bb9ebeb"
-    start_date = "2023-03-11"
-    end_date = "2023-03-12"
+    cic_id = "CIC-9b02a27b-1a6a-594b-94d1-0373d32c1977"
+    start_date = "2023-02-02"
+    end_date = "2023-02-03"
 
     main(cic_id, start_date, end_date)
