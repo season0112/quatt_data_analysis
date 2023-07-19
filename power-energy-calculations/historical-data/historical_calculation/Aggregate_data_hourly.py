@@ -85,8 +85,7 @@ S3_PROPERTIES = {
          'time': ['ts'],
          'system': ['quattId',
                     'quattBuild'],
-         'qc': ['hp1PowerInput',
-                'hp1PowerOutput',
+         'qc': ['hp1PowerOutput',
                 'hp1ElectricalEnergyCounter',
                 'hp2ElectricalEnergyCounter',
                 'hp1ThermalEnergyCounter',
@@ -101,10 +100,8 @@ S3_PROPERTIES = {
                  'compressorCrankcaseHeaterEnable',
                  'circulatingPumpDutyCycle',
                  'getCirculatingPumpRelay',
-                 'powerInput',
                  'powerOutput',
                  'temperatureOutside',
-                 'power',
                  'defrostFlag',
                  'electricalEnergyCounter',
                  'thermalEnergyCounter'],
@@ -115,10 +112,8 @@ S3_PROPERTIES = {
                  'compressorCrankcaseHeaterEnable',
                  'circulatingPumpDutyCycle',
                  'getCirculatingPumpRelay',
-                 'powerInput',
                  'powerOuput',
                  'temperatureOutside',
-                 'power',
                  'electricalEnergyCounter',
                  'thermalEnergyCounter']}
 
@@ -163,10 +158,9 @@ def bottom_plate_heater_probability(temperature_outside):
 # replace hp1.powerInput
 def prepare_data_for_calculation(df, hp):
 
-    # replace power input
-    if hp=='hp1':
-        df['hp1.powerInput'] = (
-            df['hp1.powerInput'].fillna(df['qc.hp1PowerInput']))
+    # calculate power input
+    df[f'{hp}.powerInput'] = df[f'{hp}.acInputVoltage'] * df[f'{hp}.acInputCurrent']
+    df.drop([f'{hp}.acInputVoltage', f'{hp}.acInputCurrent'], axis=1, inplace=True)
         
     # fill missing old counters
     df['qc.hp1ElectricalEnergyCounter'] = (
@@ -177,6 +171,10 @@ def prepare_data_for_calculation(df, hp):
         df['qc.hp1ThermalEnergyCounter'].fillna(df['hp1.thermalEnergyCounter']))
     df['qc.hp2ThermalEnergyCounter'] = (
         df['qc.hp2ThermalEnergyCounter'].fillna(df['hp2.thermalEnergyCounter']))
+    df.drop(['hp1.electricalEnergyCounter',
+             'hp2.electricalEnergyCounter',
+             'hp1.thermalEnergyCounter',
+             'hp2.thermalEnergyCounter'], axis=1, inplace=True) # TODO
     
     # set data availability
     df[f'{hp}_data_availability_2'] = (
@@ -203,6 +201,8 @@ def prepare_data_for_calculation(df, hp):
         np.max(df[[f'{hp}_data_availability_1',
                    f'{hp}_data_availability_2']], axis=1)
     )
+    df.drop([f'{hp}_data_availability_1',
+                f'{hp}_data_availability_2'], axis=1, inplace=True) # TODO
 
     # set bottomplateheaterenable zero in case {hp}.powerInput is zero
     # bottom_plate_heaterprobability(temp_outside) [0-1]
@@ -303,7 +303,7 @@ def aggregate_data_hourly(df, aggregations):
 
 def calculate_and_aggregate(df):
     # check for second heat pump
-    if (df['hp2.powerInput'].notna().any()):
+    if (df['hp2.acInputCurrent'].notna().any()):
         heat_pumps = ['hp1', 'hp2'] 
     else:
         heat_pumps = ['hp1']
@@ -334,6 +334,7 @@ def calculate_and_aggregate(df):
     df['hp1.powerOutput'] = (
         df['hp1.powerOutput'].fillna(df['qc.hp1PowerOutput'])
     )
+    
 
     # get cv power output
     df['cv_power_output'] = df['qc.cvPowerOutput']
@@ -427,7 +428,7 @@ def main(cic_id, start_date, end_date):
     except Exception as e:
         logger.error(f'Could not extract data from s3: {e}')
         raise
-    
+
     # check if data is empty
     if extract_df.empty:
         logger.info(f'No data found for cic_id: {cic_id}')
@@ -435,8 +436,6 @@ def main(cic_id, start_date, end_date):
     else:
         # de-duplicate dataframe
         extract_df = extract_df.drop_duplicates(subset=['time.ts'], keep='first')
-        
-        #[~extract_df.index.duplicated(keep='first')]
 
     # calculate and aggregate data
     try:
