@@ -66,18 +66,40 @@ AGGREGATIONS =[
      'src':'qc.cvEnergyCounter',
      'func':'last'},
     {'sql':'hp1_defrost', 'src':'hp1.defrostFlag', 'func':'mean'},
-
+    # extra
+    {'sql':'water_supply_temperature',
+     'src':'flowMeter.waterSupplyTemperature',
+     'func':'mean'},
+    {'sql':'water_return_temperature',
+     'src':'hp1.temperatureWaterIn',
+     'func':'mean'},
+    {'sql':'room_set_temperature',
+     'src':'thermostat.otFtRoomSetpoint',
+     'func':'mean'},
+    {'sql':'room_temperature',
+     'src':'thermostat.otFtRoomTemperature',
+     'func':'mean'},
+    {'sql':'outside_temperature',
+     'src':'hp1.temperatureOutside',
+     'func':'mean'},
+    
     # preprocessed from cic stats
+    {'sql':'house_energy_demand', 'src':'estimatedEnergyDemand', 'func':'sum'},
+
     {'sql':'hp1_energy_consumed', 'src':'hp1.energyConsumption', 'func':'sum'},
     {'sql':'hp2_energy_consumed', 'src':'hp2.energyConsumption', 'func':'sum'},
-    {'sql':'hp1_data_availability', 'src':'hp1_data_availability', 'func':'max'},
-    {'sql':'hp2_data_availability', 'src':'hp2_data_availability', 'func':'max'},
+    {'sql':'hp1_data_availability', 'src':'hp1_data_availability', 'func':'min'},
+    {'sql':'hp2_data_availability', 'src':'hp2_data_availability', 'func':'min'},
     {'sql':'hp1_heat_generated', 'src':'hp1.heatGenerated', 'func':'sum'},
     {'sql':'hp2_heat_generated', 'src':'hp2.heatGenerated', 'func':'sum'},
     {'sql':'boiler_heat_generated', 'src':'cvHeatGenerated', 'func':'sum'},
     {'sql':'hp1_active', 'src':'hp1.active', 'func':'mean'},
     {'sql':'hp2_active', 'src':'hp2.active', 'func':'mean'},
-    {'sql':'boiler_active', 'src':'cvActive', 'func':'mean'}
+    {'sql':'boiler_active', 'src':'cvActive', 'func':'mean'},
+    {'sql':'anti_freeze_protection', 'src':'antiFreeze', 'func':'mean'}, # extra
+    {'sql':'flow_rate_oos', 'src':'flowRateOos', 'func':'mean'},# extra
+    {'sql':'inlet_temperature_oos', 'src':'inletTemperatureOos', 'func':'mean'} # extra
+
 ]
 
 # properties to download from S3
@@ -92,7 +114,14 @@ S3_PROPERTIES = {
                 'hp2ThermalEnergyCounter',
                 'cvEnergyCounter',
                 'cvPowerOutput',
-                'supervisoryControlMode'],
+                'supervisoryControlMode',
+                'watchdogState',
+                'watchdogSubcode',
+                'systemWatchdogCode',
+                'estimatedPowerDemand'],
+        'flowMeter' : ['waterSupplyTemperature'],
+        'thermostat' : ['otFtRoomSetpoint',
+                        'otFtRoomTemperature'],
          'hp1': ['acInputVoltage',
                  'acInputCurrent',
                  'getFanSpeed',
@@ -104,7 +133,11 @@ S3_PROPERTIES = {
                  'temperatureOutside',
                  'defrostFlag',
                  'electricalEnergyCounter',
-                 'thermalEnergyCounter'],
+                 'thermalEnergyCounter',
+                 'temperatureWaterIn',
+                 'watchdogCode',
+                 'temperatureOutside',
+                 'power'],
          'hp2': ['acInputVoltage',
                  'acInputCurrent',
                  'getFanSpeed',
@@ -112,28 +145,19 @@ S3_PROPERTIES = {
                  'compressorCrankcaseHeaterEnable',
                  'circulatingPumpDutyCycle',
                  'getCirculatingPumpRelay',
-                 'powerOuput',
+                 'powerOutput',
                  'temperatureOutside',
                  'electricalEnergyCounter',
-                 'thermalEnergyCounter']}
+                 'thermalEnergyCounter',
+                 'power']}
 
 # Integration keys
 INTEGRATION_KEYS = {'hp1.energyConsumption':'hp1.powerConsumption',
                     'hp2.energyConsumption':'hp2.powerConsumption',
                     'hp1.heatGenerated':'hp1.powerOutput',
                     'hp2.heatGenerated':'hp2.powerOutput',
-                    'cvHeatGenerated':'cv_power_output'}
-
-
-# load linear model with pickle
-try:
-    filename = os.path.join(__location__, 'energy-power-standard-model.pkl')
-    with open(filename, 'rb') as f:
-        LINEAR_MODEL = pickle.load(f)
-except Exception as e:
-    logger.critical(f'Could not load linear model {e}')
-    sys.exit()
-
+                    'cvHeatGenerated':'cv_power_output',
+                    'estimatedEnergyDemand':'qc.estimatedPowerDemand'}
 
 # function to estimate bphprobability
 def bottom_plate_heater_probability(temperature_outside):
@@ -163,18 +187,12 @@ def prepare_data_for_calculation(df, hp):
     df.drop([f'{hp}.acInputVoltage', f'{hp}.acInputCurrent'], axis=1, inplace=True)
         
     # fill missing old counters
-    df['qc.hp1ElectricalEnergyCounter'] = (
-        df['qc.hp1ElectricalEnergyCounter'].fillna(df['hp1.electricalEnergyCounter']))
-    df['qc.hp2ElectricalEnergyCounter'] = (
-        df['qc.hp2ElectricalEnergyCounter'].fillna(df['hp2.electricalEnergyCounter']))
-    df['qc.hp1ThermalEnergyCounter'] = (
-        df['qc.hp1ThermalEnergyCounter'].fillna(df['hp1.thermalEnergyCounter']))
-    df['qc.hp2ThermalEnergyCounter'] = (
-        df['qc.hp2ThermalEnergyCounter'].fillna(df['hp2.thermalEnergyCounter']))
-    df.drop(['hp1.electricalEnergyCounter',
-             'hp2.electricalEnergyCounter',
-             'hp1.thermalEnergyCounter',
-             'hp2.thermalEnergyCounter'], axis=1, inplace=True) # TODO
+    df[f'qc.{hp}ElectricalEnergyCounter'] = (
+        df[f'qc.{hp}ElectricalEnergyCounter'].fillna(df[f'{hp}.electricalEnergyCounter']))
+    df[f'qc.{hp}ThermalEnergyCounter'] = (
+        df[f'qc.{hp}ThermalEnergyCounter'].fillna(df[f'{hp}.thermalEnergyCounter']))
+    df.drop([f'{hp}.electricalEnergyCounter',
+             f'{hp}.thermalEnergyCounter'], axis=1, inplace=True)
     
     # set data availability
     df[f'{hp}_data_availability_2'] = (
@@ -225,13 +243,19 @@ def prepare_data_for_calculation(df, hp):
     )
     return df
 
-def estimate_energy_consumption(modelInput, 
+def estimate_energy_consumption(powerInput, 
+                                getFanSpeed,
+                                bottomPlateHeaterEnable,
                                 circulatingPumpDutyCycle, 
                                 circulatingPumpRelay, 
                                 crankcaseHeater):
-    return (LINEAR_MODEL.predict(modelInput)
-            + (circulatingPumpDutyCycle * circulatingPumpRelay)
-            + (crankcaseHeater * 40))
+    energy_consumption = (5.150232354845286 
+                          + (1.1240096401010435 * powerInput)
+                          - (0.04858859969715763 * getFanSpeed)
+                          + (150.06430841218332 * bottomPlateHeaterEnable)
+                          + (circulatingPumpDutyCycle * circulatingPumpRelay)
+                          + (40 * crankcaseHeater))
+    return energy_consumption
 
 def integrate_data(df, keys):
     df['timediff[S]'] = (df.sort_values(['cic_id','time.ts'])
@@ -315,9 +339,9 @@ def calculate_and_aggregate(df):
         # calculate powerConsumption for all rows
         df[f'{hp}.powerConsumption'] = (
             estimate_energy_consumption(
-                df[[f'{hp}.powerInput',
-                    f'{hp}.getFanSpeed',
-                    f'{hp}.bottomPlateHeaterEnable']].fillna(0).values,
+                df[f'{hp}.powerInput'].fillna(0).values,
+                df[f'{hp}.getFanSpeed'].fillna(0).values,
+                df[f'{hp}.bottomPlateHeaterEnable'].fillna(0).values,
                 df[f'{hp}.circulatingPumpDutyCycle'].values,
                 df[f'{hp}.getCirculatingPumpRelay'].values,
                 df[f'{hp}.compressorCrankcaseHeaterEnable'].values)
@@ -330,11 +354,27 @@ def calculate_and_aggregate(df):
         # get activity of heatpump
         df[f'{hp}.active'] = df['qc.supervisoryControlMode'].isin([2,3]).astype(float)
 
+        # get power output
+        df[f'{hp}.powerOutput'] = (
+            df[f'{hp}.powerOutput'].fillna(df[f'{hp}.power']))
+
     # get hp1 power output
     df['hp1.powerOutput'] = (
         df['hp1.powerOutput'].fillna(df['qc.hp1PowerOutput'])
     )
     
+    # get anti-freeze and oos states
+    df['antiFreeze'] = df['qc.supervisoryControlMode'].isin([96,97,98,99]).astype(float)
+    df['flowRateOos'] = np.maximum(
+        np.all([df['qc.watchdogState']==8,
+                df['qc.watchdogSubcode']==2],
+                axis=0).astype(float),
+        df['qc.systemWatchdogCode']==2)
+    df['inletTemperatureOos'] = np.maximum(
+        np.all([df['qc.watchdogState']==2,
+                df['qc.watchdogSubcode']==10],
+                axis=0).astype(float),
+        df['qc.systemWatchdogCode']==10)
 
     # get cv power output
     df['cv_power_output'] = df['qc.cvPowerOutput']
@@ -456,13 +496,26 @@ def main(cic_id, start_date, end_date):
     
     logger.info(f'Finished successfully for cic_id: {cic_id}')
 
+def lambda_handler(event, context):
+    cic_id = event['cic_id']
+    start_date = event['start_date']
+    end_date = event['end_date']
+
+    main(cic_id, start_date, end_date)
+
 if __name__ == "__main__":
     # cic_id = sys.argv[1]
     # start_date = sys.argv[2]
     # end_date = sys.argv[3]
 
-    cic_id = "CIC-9b02a27b-1a6a-594b-94d1-0373d32c1977"
-    start_date = "2023-02-02"
-    end_date = "2023-02-03"
+    # production
+    cic_id = "CIC-9bfe71f8-8749-56a7-816c-c290df324855"
+    start_date = "2022-12-23"
+    end_date = "2022-12-24"
+
+    # development
+    # cic_id = "CIC-f42058e3-44c5-5d70-809d-f2ee78b2abf9"
+    # start_date = "2023-02-28"
+    # end_date = "2023-03-01"
 
     main(cic_id, start_date, end_date)

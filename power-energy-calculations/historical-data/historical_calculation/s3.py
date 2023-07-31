@@ -82,8 +82,9 @@ def get_cic_data(self, cic_ids: Union[list, str],
     df = pd.json_normalize(json_data, max_level=1)
 
     # restore de-duplicated data if it exists
-    df['msg_time'].fillna(method='ffill', inplace=True)
-    df = df.groupby('msg_time').ffill()
+    if 'msg_time' in df.columns:
+        df['msg_time'].fillna(method='ffill', inplace=True)
+        df = df.groupby('msg_time').ffill()
 
     return df
 
@@ -150,8 +151,8 @@ def load_data_as_dict(self, bucket_name, s3_objects,
             json_msg = json.loads(msg)
             stats = json_msg['payload']['stats']
             
-            # if not stats: # if stats is empty
-            #     continue
+            if not stats: # if stats is empty
+                continue
 
             if add_cic_id:
                 cic_id = json_msg['payload']['ctx']['hostName']
