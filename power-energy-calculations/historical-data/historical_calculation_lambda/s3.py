@@ -81,7 +81,7 @@ def get_cic_data(self, cic_ids: Union[list, str],
 
     df = pd.json_normalize(json_data, max_level=1)
 
-    # restore de-duplicated data if it exists
+    # restore de-duplicated data if exists
     if 'msg_time' in df.columns:
         df['msg_time'].fillna(method='ffill', inplace=True)
         df = df.groupby('msg_time').ffill()
@@ -160,7 +160,6 @@ def load_data_as_dict(self, bucket_name, s3_objects,
             if filter_objects or filter_properties:
                 stats = self.filter_stats(stats, filter_objects, filter_properties, add_cic_id, cic_id)
             
-            # check if stats is not an empty object
             stats[0]['msg_time'] = stats[0]['time']['ts']
             data = data + stats
     
@@ -205,13 +204,17 @@ def add_custom_methods(class_attributes, **kwargs):
     class_attributes['load_data_as_dict'] = load_data_as_dict
     class_attributes['filter_stats'] = filter_stats
 
-def create_s3_client():
+def create_s3_client(aws_profile=""):
 
     # Replace this with the name of your AWS profile
     # AWS_PROFILE = 'production'
 
     # Create a session using the named profile
-    session = boto3.Session()
+    if aws_profile:
+        session = boto3.Session(profile_name=aws_profile)
+    # use default profile if no profile is specified
+    else:
+        session = boto3.Session()
     session.events.register('creating-client-class.s3', add_custom_methods)
 
     # Create a client for interacting with the S3 service
@@ -220,13 +223,13 @@ def create_s3_client():
     return quatt_s3_client
 
 if __name__ == '__main__':
-    test_cloud_type = 'production'
-    # test_cloud_type = 'development'
+    # test_cloud_type = 'production'
+    test_cloud_type = 'development'
     
     if test_cloud_type == 'production':
-        cic_ids = 'CIC-00149d9a-da31-5e61-844d-3e818b8a2ded'
-        start_date = datetime(2023,3,18)
-        end_date = datetime(2023,3,19)
+        cic_ids = 'CIC-f42058e3-44c5-5d70-809d-f2ee78b2abf9'
+        start_date = datetime(2023,7,6)
+        end_date = datetime(2023,7,8)
         extract_date = datetime(2023,5,31)
         props = {'time': ['ts'],
                 'flowMeter': ['flowRate', 'waterSupplyTemperature']}
@@ -289,6 +292,6 @@ if __name__ == '__main__':
                                             filter_properties={'hp1': ['temperatureWaterIn', 'temperatureWaterOut']}
                                             )
     
-    # print(df_new.head())
-    # print(df_new.describe())
+    print(df_new.head())
+    print(df_new.describe())
     pass
