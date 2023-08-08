@@ -18,7 +18,6 @@ import re
 import mysql.connector
 from mysql.connector import Error
 from urllib.parse import urlparse
-# from dotenv import load_dotenv
 import os
 import sys
 from pathlib import Path
@@ -33,10 +32,6 @@ logging.basicConfig(filename="std.log",
 logger=logging.getLogger()
 logger.setLevel(logging.INFO)
 
-__location__ = os.path.realpath(
-    os.path.join(os.getcwd(), os.path.dirname(__file__)))
-
-# # load .env file
 try:
     MYSQL_URL = os.environ['MYSQLDEV']
 except Exception as e:
@@ -423,9 +418,9 @@ def push_data_to_mysql(agg_df: pd.DataFrame):
     cursor.close()
     connection.close()
 
-def extract_data_from_s3(cic_id, start_date, end_date):
+def extract_data_from_s3(cic_id, start_date, end_date, aws_profile):
     # create s3 clients
-    quatt_s3_client_pull = s3.create_s3_client() # aws_profile="nout_prod"
+    quatt_s3_client_pull = s3.create_s3_client(aws_profile)
     
     # add 20 min to end_date
     extract_df = quatt_s3_client_pull.get_cic_data(cic_ids=cic_id, 
@@ -436,7 +431,7 @@ def extract_data_from_s3(cic_id, start_date, end_date):
                                                     )
     return extract_df
 
-def main(cic_id, start_date, end_date):
+def main(cic_id, start_date, end_date, aws_profile=""):
     # log input parameters
     logger.info(f'''Input parameters: cic_id: {cic_id}, start_date: {start_date}, end_date: {end_date}''')
     
@@ -461,7 +456,7 @@ def main(cic_id, start_date, end_date):
         end_date_extract = end_date + timedelta(minutes=20)
 
         # extract data from s3
-        extract_df = extract_data_from_s3(cic_id, start_date, end_date_extract)
+        extract_df = extract_data_from_s3(cic_id, start_date, end_date_extract, aws_profile)
     except Exception as e:
         logger.exception(f'Could not extract data from s3: {e}')
         raise
@@ -524,4 +519,6 @@ if __name__ == "__main__":
     start_date = "2022-12-23"
     end_date = "2022-12-24"
 
-    main(cic_id, start_date, end_date)
+    aws_profile = 'nout_prod'
+
+    main(cic_id, start_date, end_date, aws_profile)
