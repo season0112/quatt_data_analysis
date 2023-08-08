@@ -37,6 +37,9 @@ try:
 except Exception as e:
     logger.critical(f'Could not load .env or MYSQLDEV url not in .env file, {e}')
 
+# SETTINGS
+MAX_INTEGRATION_INTERVAL =  900# max interval in seconds for which integration is calculated
+
 # INPUTS FOR CALCULATION
 AGGREGATIONS =[
     # directly available from cic stats
@@ -253,6 +256,7 @@ def integrate_data(df, keys):
                          .groupby('cic_id')['time.ts']
                          .diff()/1000
     )
+    df['timediff[S]'] = np.minimum(df['timediff[S]'], MAX_INTEGRATION_INTERVAL)
 
     for key, value in zip(keys.keys(), keys.values()):
         try:
@@ -515,9 +519,9 @@ if __name__ == "__main__":
     # start_date = sys.argv[2]
     # end_date = sys.argv[3]
 
-    cic_id = "CIC-9bfe71f8-8749-56a7-816c-c290df324855"
-    start_date = "2022-12-23"
-    end_date = "2022-12-24"
+    cic_id = "CIC-ab3bcb18-a5e5-5ed7-80ff-adfdfa66ffd7"
+    start_date = "2023-04-01"
+    end_date = "2023-04-02"
 
     aws_profile = 'nout_prod'
 
