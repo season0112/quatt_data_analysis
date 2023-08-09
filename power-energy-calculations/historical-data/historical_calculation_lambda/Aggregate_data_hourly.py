@@ -37,6 +37,12 @@ try:
 except Exception as e:
     logger.critical(f'Could not load .env or MYSQLDEV url not in .env file, {e}')
 
+# SETTINGS
+MAX_INTEGRATION_INTERVAL =  900# max interval in seconds for which integration is calculated
+RECALCULATE_HP_HEAT_PRODUCED = False # if True, hp1.powerOuput calculated manually
+DENSITY_WATER = 997 # kg/m3
+SPECIFIC_HEAT_WATER = 4186 # J/kg/K
+
 # INPUTS FOR CALCULATION
 AGGREGATIONS =[
     # directly available from cic stats
@@ -97,7 +103,10 @@ AGGREGATIONS =[
 S3_PROPERTIES = {
          'time': ['ts'],
          'system': ['quattId',
-                    'quattBuild'],
+                    'quattBuild',
+                    'hp1Connected',
+                    'hp2Connected',
+                    'modbusConnected'],
          'qc': ['hp1PowerOutput',
                 'hp1ElectricalEnergyCounter',
                 'hp2ElectricalEnergyCounter',
@@ -110,7 +119,8 @@ S3_PROPERTIES = {
                 'watchdogSubcode',
                 'systemWatchdogCode',
                 'estimatedPowerDemand'],
-        'flowMeter' : ['waterSupplyTemperature'],
+        'flowMeter' : ['waterSupplyTemperature',
+                       'flowRate'],
         'thermostat' : ['otFtRoomSetpoint',
                         'otFtRoomTemperature'],
          'hp1': ['acInputVoltage',
@@ -149,6 +159,14 @@ INTEGRATION_KEYS = {'hp1.energyConsumption':'hp1.powerConsumption',
                     'hp2.heatGenerated':'hp2.powerOutput',
                     'cvHeatGenerated':'cv_power_output',
                     'estimatedEnergyDemand':'qc.estimatedPowerDemand'}
+
+
+# calculate heat produced
+# TO DO: check unit of flowrate.
+# output should be in W (J/s)
+def hp_heat_produced(flowrate, water_in, water_out):
+    return (flowrate * 3600 * DENSITY_WATER * 
+            SPECIFIC_HEAT_WATER * (water_out - water_in))
 
 # function to estimate bphprobability
 def bottom_plate_heater_probability(temperature_outside):
@@ -253,6 +271,7 @@ def integrate_data(df, keys):
                          .groupby('cic_id')['time.ts']
                          .diff()/1000
     )
+    df['timediff[S]'] = np.minimum(df['timediff[S]'], MAX_INTEGRATION_INTERVAL)
 
     for key, value in zip(keys.keys(), keys.values()):
         try:
@@ -323,6 +342,9 @@ def calculate_and_aggregate(df):
     else:
         heat_pumps = ['hp1']
 
+    # merge hp1 disconnected data
+    df['system.hp1Connected'] = df['system.hp1Connected'].fillna(df['system.modbusConnected'])
+
     for hp in heat_pumps:
         # get data availability and parameters for power calculation
         df = prepare_data_for_calculation(df, hp)
@@ -337,7 +359,6 @@ def calculate_and_aggregate(df):
                 df[f'{hp}.getCirculatingPumpRelay'].values,
                 df[f'{hp}.compressorCrankcaseHeaterEnable'].values)
         )
-
         # set all values of powerconsumption to zero where supervisoryControlMode is NaN
         df.loc[df['qc.supervisoryControlMode'].isna(), 
                     f'{hp}.powerConsumption'] = 0
@@ -348,11 +369,22 @@ def calculate_and_aggregate(df):
         # get power output
         df[f'{hp}.powerOutput'] = (
             df[f'{hp}.powerOutput'].fillna(df[f'{hp}.power']))
+        
+        # set power consumption and production to zero where heat pump is disconnected
+        df.loc[df[f'system.{hp}Connected'].fillna(True)==False,
+               [f'{hp}.powerConsumption', f'{hp}.powerOutput']] = 0
 
     # get hp1 power output
-    df['hp1.powerOutput'] = (
-        df['hp1.powerOutput'].fillna(df['qc.hp1PowerOutput'])
-    )
+    if RECALCULATE_HP_HEAT_PRODUCED:
+        df['hp1.powerOutput'] = (
+            hp_heat_produced(df['flowMeter.flowRate'].fillna(0).values,
+                             df['hp1.waterTemperatureIn'].fillna(0).values,
+                             df['flowMeter.waterSupplyTemperature'].fillna(0).values)
+        )
+    else:
+        df['hp1.powerOutput'] = (
+            df['hp1.powerOutput'].fillna(df['qc.hp1PowerOutput'])
+        )
     
     # get anti-freeze and oos states
     df['antiFreeze'] = df['qc.supervisoryControlMode'].isin([96,97,98,99]).astype(float)
@@ -370,6 +402,8 @@ def calculate_and_aggregate(df):
     # get cv power output
     df['cv_power_output'] = df['qc.cvPowerOutput']
     df.loc[df['cv_power_output'] < 0, 'cv_power_output'] = 0
+    df.loc[df['system.hp2Connected'].fillna(df['system.hp1Connected'])==False,
+           'cv_power_output'] = 0 # see END-283
     df['cvActive'] = df['qc.supervisoryControlMode'].isin([3,4]).astype(float)
 
     # integrate data
@@ -511,13 +545,11 @@ def lambda_handler(event, context):
         return sqs_batch_response
 
 if __name__ == "__main__":
-    # cic_id = sys.argv[1]
-    # start_date = sys.argv[2]
-    # end_date = sys.argv[3]
 
-    cic_id = "CIC-9bfe71f8-8749-56a7-816c-c290df324855"
-    start_date = "2022-12-23"
-    end_date = "2022-12-24"
+    # test data
+    cic_id = "CIC-6e3d2c85-f792-5a06-afc0-a7525487fa4f"
+    start_date = "2023-03-24"
+    end_date = "2023-03-25"
 
     aws_profile = 'nout_prod'
 
