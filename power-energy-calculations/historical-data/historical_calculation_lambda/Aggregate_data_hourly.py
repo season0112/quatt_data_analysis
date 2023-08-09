@@ -39,6 +39,9 @@ except Exception as e:
 
 # SETTINGS
 MAX_INTEGRATION_INTERVAL =  900# max interval in seconds for which integration is calculated
+RECALCULATE_HP_HEAT_PRODUCED = False # if True, hp1.powerOuput calculated manually
+DENSITY_WATER = 1000 # kg/m3
+SPECIFIC_HEAT_WATER = 4180 # J/kg/K
 
 # INPUTS FOR CALCULATION
 AGGREGATIONS =[
@@ -116,7 +119,8 @@ S3_PROPERTIES = {
                 'watchdogSubcode',
                 'systemWatchdogCode',
                 'estimatedPowerDemand'],
-        'flowMeter' : ['waterSupplyTemperature'],
+        'flowMeter' : ['waterSupplyTemperature',
+                       'flowRate'],
         'thermostat' : ['otFtRoomSetpoint',
                         'otFtRoomTemperature'],
          'hp1': ['acInputVoltage',
@@ -155,6 +159,13 @@ INTEGRATION_KEYS = {'hp1.energyConsumption':'hp1.powerConsumption',
                     'hp2.heatGenerated':'hp2.powerOutput',
                     'cvHeatGenerated':'cv_power_output',
                     'estimatedEnergyDemand':'qc.estimatedPowerDemand'}
+
+
+# calculate heat produced
+# TO DO: check unit of flowrate.
+# output should be in W (J/s)
+def hp_heat_produced(flowrate, water_in, water_out):
+    return flowrate * DENSITY_WATER * SPECIFIC_HEAT_WATER * (water_out - water_in)
 
 # function to estimate bphprobability
 def bottom_plate_heater_probability(temperature_outside):
@@ -363,9 +374,16 @@ def calculate_and_aggregate(df):
                [f'{hp}.powerConsumption', f'{hp}.powerOutput']] = 0
 
     # get hp1 power output
-    df['hp1.powerOutput'] = (
-        df['hp1.powerOutput'].fillna(df['qc.hp1PowerOutput'])
-    )
+    if RECALCULATE_HP_HEAT_PRODUCED:
+        df['hp1.powerOutput'] = (
+            hp_heat_produced(df['flowMeter.flowRate'].fillna(0).values,
+                             df['hp1.waterTemperatureIn'].fillna(0).values,
+                             df['flowMeter.waterSupplyTemperature'].fillna(0).values)
+        )
+    else:
+        df['hp1.powerOutput'] = (
+            df['hp1.powerOutput'].fillna(df['qc.hp1PowerOutput'])
+        )
     
     # get anti-freeze and oos states
     df['antiFreeze'] = df['qc.supervisoryControlMode'].isin([96,97,98,99]).astype(float)
