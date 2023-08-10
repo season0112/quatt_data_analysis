@@ -1,6 +1,4 @@
--- TO DO: replace software version to 2.0.4
--- TO DO: Add possibility to filter for list of cic's
-
+-- To do: test with data in _cics table
 INSERT INTO cic_counter_offset (
 	cic_id,
     `time`,
@@ -14,7 +12,12 @@ with cte_update_time AS(
 	SELECT distinct cic_id,
 		MIN(`time`) as 'update_time'
 	FROM cic_data
-	WHERE quattBuild like '2.0.1%'
+	WHERE quattBuild like '2.0.8%'
+		AND d.cic_id IN (SELECT DISTINCT(cic_id)
+							FROM _cicsWithSoftwareVersion208 
+							WHERE reached_208_at IS NOT NULL 
+								AND NOT data_ready
+								AND NOT data_missing)
 ),
 cte_energy_time AS (
 	SELECT d.cic_id,

@@ -25,7 +25,11 @@ WITH pre_update_counters AS (
 			SUM(boiler_heat_generated) OVER (PARTITION BY d.cic_id ORDER BY d.cic_id, d.`time`) + COALESCE(boiler_heat_generated_offset, 0) AS cv_energy_counter
 		FROM cic_data d
 			LEFT JOIN cic_counter_offset o ON d.cic_id=o.cic_id
-		WHERE d.cic_id = 'CIC-17fcd27d-dbd7-561c-887e-faf59bb9ebeb'
+		WHERE d.cic_id IN (SELECT DISTINCT(cic_id)
+							FROM _cicsWithSoftwareVersion208 
+							WHERE reached_208_at IS NOT NULL 
+								AND NOT data_ready
+								AND NOT data_missing)
 )
 SELECT cic_id,
 	`time`,
@@ -65,7 +69,11 @@ WITH post_update_counters AS (
 			OLD_cv_energy_counter AS cv_energy_counter
 		FROM cic_data d
 			LEFT JOIN cic_counter_offset o ON d.cic_id=o.cic_id
-		WHERE d.cic_id = 'CIC-17fcd27d-dbd7-561c-887e-faf59bb9ebeb'
+		WHERE AND d.cic_id IN (SELECT DISTINCT(cic_id)
+							FROM _cicsWithSoftwareVersion208 
+							WHERE reached_208_at IS NOT NULL 
+								AND NOT data_ready
+								AND NOT data_missing)
 )
 SELECT cic_id,
 	`time`,
