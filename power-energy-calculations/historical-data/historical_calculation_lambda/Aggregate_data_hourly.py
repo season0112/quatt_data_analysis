@@ -41,7 +41,7 @@ except Exception as e:
 MAX_INTEGRATION_INTERVAL =  900# max interval in seconds for which integration is calculated
 RECALCULATE_HP_HEAT_PRODUCED = False # if True, hp1.powerOuput calculated manually
 DENSITY_WATER = 997 # kg/m3
-SPECIFIC_HEAT_WATER = 4186 # J/kg/K
+SPECIFIC_HEAT_WATER = 4182 # J/kg/K
 
 # INPUTS FOR CALCULATION
 AGGREGATIONS =[
@@ -162,10 +162,8 @@ INTEGRATION_KEYS = {'hp1.energyConsumption':'hp1.powerConsumption',
 
 
 # calculate heat produced
-# TO DO: check unit of flowrate.
-# output should be in W (J/s)
 def hp_heat_produced(flowrate, water_in, water_out):
-    return (flowrate * 3600 * DENSITY_WATER * 
+    return (flowrate / 3600 / 1000 * DENSITY_WATER * 
             SPECIFIC_HEAT_WATER * (water_out - water_in))
 
 # function to estimate bphprobability
