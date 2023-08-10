@@ -1,6 +1,5 @@
 -- TO DO: Adapt query to only sum for software version up to 2.0.4 (exclusive)
 -- TO DO: Add possibility to filter for list of cic's AND remove marco's id
-
 -- insert pre-update-counters
 INSERT INTO cic_counters (
 	cic_id,
@@ -25,7 +24,7 @@ WITH pre_update_counters AS (
 			SUM(boiler_heat_generated) OVER (PARTITION BY d.cic_id ORDER BY d.cic_id, d.`time`) + COALESCE(boiler_heat_generated_offset, 0) AS cv_energy_counter
 		FROM cic_data d
 			LEFT JOIN cic_counter_offset o ON d.cic_id=o.cic_id
-		WHERE d.cic_id = 'CIC-17fcd27d-dbd7-561c-887e-faf59bb9ebeb'
+		WHERE d.cic_id IN (SELECT DISTINCT(cic_id) FROM cic_data WHERE cic_id = 'CIC-17fcd27d-dbd7-561c-887e-faf59bb9ebeb')
 )
 SELECT cic_id,
 	`time`,
@@ -65,7 +64,7 @@ WITH post_update_counters AS (
 			OLD_cv_energy_counter AS cv_energy_counter
 		FROM cic_data d
 			LEFT JOIN cic_counter_offset o ON d.cic_id=o.cic_id
-		WHERE d.cic_id = 'CIC-17fcd27d-dbd7-561c-887e-faf59bb9ebeb'
+		WHERE d.cic_id IN (SELECT DISTINCT(cic_id) FROM cic_data WHERE cic_id = 'CIC-17fcd27d-dbd7-561c-887e-faf59bb9ebeb')
 )
 SELECT cic_id,
 	`time`,
