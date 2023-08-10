@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS `_cicsWithSoftwareVersion207` (
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
     `reached_207_at` TIMESTAMP,
-    `data_ready` BOOLEAN,
-    `data_migrated` BOOLEAN,
+    `data_ready` BOOLEAN NOT NULL DEFAULT FALSE,
+    `data_migrated` BOOLEAN NOT NULL DEFAULT FALSE,
+    `data_missing` BOOLEAN NOT NULL DEFAULT FALSE,
     PRIMARY KEY (`id`)
 );
