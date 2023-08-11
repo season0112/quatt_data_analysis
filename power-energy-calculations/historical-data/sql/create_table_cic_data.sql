@@ -1,5 +1,5 @@
 CREATE TABLE IF NOT EXISTS `cic_data` (
-    `id` BIGINT NOT NULL AUTO_INCREMENT,
+    `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `cic_id` CHAR(40) NOT NULL check(cic_id REGEXP 'CIC-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'),
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
     `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP NOT NULL,
@@ -32,5 +32,5 @@ CREATE TABLE IF NOT EXISTS `cic_data` (
     `inlet_temperature_oos` DECIMAL(3,2), -- qc.watchdogstate==2 + qc.watchdogsubcode==10 / hp1.watchdogcode==10
     `number_of_rows` INT NOT NULL,
     `quattBuild` CHAR(40),
-    PRIMARY KEY (`id`)
+    UNIQUE INDEX `cic_time` (`cic_id`, `time`)
 );
