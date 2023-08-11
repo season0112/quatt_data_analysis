@@ -40,9 +40,14 @@ def lambda_handler(event, context):
                 logger.debug(f"Processing record: {record}")
                 attributes = record["messageAttributes"]
 
-                cic_id = attributes['cic_id']['StringValue']
-                start_date = attributes['start_date']['StringValue']
-                end_date = attributes['end_date']['StringValue']
+                try:
+                    cic_id = attributes['cic_id']['stringValue']
+                    start_date = attributes['start_date']['stringValue']
+                    end_date = attributes['end_date']['stringValue']
+                except:
+                    cic_id = attributes['cic_id']['StringValue']
+                    start_date = attributes['start_date']['StringValue']
+                    end_date = attributes['end_date']['StringValue']
 
                 main(cic_id, start_date, end_date)
 
