@@ -88,21 +88,22 @@ def main():
     redis_data = get_cic_stats_from_redis(REDIS_URL)
 
     for cic in redis_data:
-        try:
-            cic_id = cic['cic']
+        while message_count < 10:
+            try:
+                cic_id = cic['cic']
 
-            response = sent_message_to_sqs(sqs, cic_id, yesterday)
+                response = sent_message_to_sqs(sqs, cic_id, yesterday)
 
-            if response['ResponseMetadata']['HTTPStatusCode'] != 200:
-                logger.error(f"Error in sending message to SQS for {cic_id}, {yesterday}", 
-                            exc_info=True)
+                if response['ResponseMetadata']['HTTPStatusCode'] != 200:
+                    logger.error(f"Error in sending message to SQS for {cic_id}, {yesterday}", 
+                                exc_info=True)
+                    error_count += 1
+                else:
+                    logger.debug(f"Message sent to SQS for {cic_id}, {yesterday}")
+                    message_count += 1
+            except:
+                logger.warning("No cic_id found in redis_data", exc_info=True)
                 error_count += 1
-            else:
-                logger.debug(f"Message sent to SQS for {cic_id}, {yesterday}")
-                message_count += 1
-        except:
-            logger.warning("No cic_id found in redis_data", exc_info=True)
-            error_count += 1
 
     logger.info(f"Finished sending {message_count} messages to SQS. {error_count} errors")
 
