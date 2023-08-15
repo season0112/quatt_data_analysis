@@ -12,15 +12,11 @@ import boto3
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
-import pickle
 import os
 import re
-import mysql.connector
-from mysql.connector import Error
+import pymysql.cursors
 from urllib.parse import urlparse
 import os
-import sys
-from pathlib import Path
 import logging
 
 # set up logging
@@ -39,9 +35,10 @@ except Exception as e:
 
 # SETTINGS
 MAX_INTEGRATION_INTERVAL =  900# max interval in seconds for which integration is calculated
-RECALCULATE_HP_HEAT_PRODUCED = False # if True, hp1.powerOuput calculated manually
+RECALCULATE_HP_HEAT_PRODUCED = True # if True, hp1.powerOuput calculated manually
 DENSITY_WATER = 997 # kg/m3
 SPECIFIC_HEAT_WATER = 4182 # J/kg/K
+MYSQL_TABLE_NAME = 'cic_data'
 
 # INPUTS FOR CALCULATION
 AGGREGATIONS =[
@@ -136,8 +133,8 @@ S3_PROPERTIES = {
                  'electricalEnergyCounter',
                  'thermalEnergyCounter',
                  'temperatureWaterIn',
+                 'temperatureWaterOut',
                  'watchdogCode',
-                 'temperatureOutside',
                  'power'],
          'hp2': ['acInputVoltage',
                  'acInputCurrent',
@@ -374,11 +371,19 @@ def calculate_and_aggregate(df):
 
     # get hp1 power output
     if RECALCULATE_HP_HEAT_PRODUCED:
+        # get heat produced based on sensors
         df['hp1.powerOutput'] = (
             hp_heat_produced(df['flowMeter.flowRate'].fillna(0).values,
-                             df['hp1.waterTemperatureIn'].fillna(0).values,
-                             df['flowMeter.waterSupplyTemperature'].fillna(0).values)
+                             df['hp1.temperatureWaterIn'].fillna(0).values,
+                             df['hp1.temperatureWaterOut'].fillna(0).values)
+                            #  df['flowMeter.waterSupplyTemperature'].fillna(0).values)
         )
+        # set power output to zero where heat pump is disconnected
+        df.loc[df['system.hp1Connected'].fillna(True)==False,
+               ['hp1.powerOutput']] = 0
+        # set output to zero where supervisoryControlMode is not 2 or 3
+        df.loc[df['qc.supervisoryControlMode'].fillna(0).isin([2,3])==False,
+                ['hp1.powerOutput']] = 0
     else:
         df['hp1.powerOutput'] = (
             df['hp1.powerOutput'].fillna(df['qc.hp1PowerOutput'])
@@ -412,26 +417,29 @@ def calculate_and_aggregate(df):
     return aggregated_data, df
 
 def make_insert_row_query(index, row):
-    query_start = "INSERT INTO cic_data (`time`,"
-    query_end = f") VALUES ('{index}',"
+    query_start = f"INSERT INTO {MYSQL_TABLE_NAME} (`time`,"
+    query_mid = f") VALUES ('{index}',"
+    query_end = f" ON DUPLICATE KEY UPDATE `time`='{index}'"
     
     # drop nan values
     row = row.dropna()
 
     for column in row.index:
         query_start += f"{column},"
-        query_end += f"'{row[column]}',"
-    query = query_start[:-1] + query_end[:-1] + ")"
+        query_mid += f"'{row[column]}',"
+        query_end += f", {column}='{row[column]}'"
+    query = query_start[:-1] + query_mid[:-1] + ")" + query_end + ";"
     return query
 
 # create connection to mysql
 def push_data_to_mysql(agg_df: pd.DataFrame):
     parsed_mysql_url = urlparse(MYSQL_URL)
-    connection = mysql.connector.connect(host=parsed_mysql_url.hostname,
-                                            user=parsed_mysql_url.username,
-                                            password=parsed_mysql_url.password,
-                                            database=parsed_mysql_url.path[1:],
-                                            port=parsed_mysql_url.port)
+    connection = pymysql.connect(host=parsed_mysql_url.hostname,
+                                user=parsed_mysql_url.username,
+                                password=parsed_mysql_url.password,
+                                database=parsed_mysql_url.path[1:],
+                                port=parsed_mysql_url.port,
+                                autocommit=True)
 
     # create cursor
     cursor = connection.cursor()
@@ -530,9 +538,14 @@ def lambda_handler(event, context):
                 logger.debug(f"Processing record: {record}")
                 attributes = record["messageAttributes"]
 
-                cic_id = attributes['cic_id']['stringValue']
-                start_date = attributes['start_date']['stringValue']
-                end_date = attributes['end_date']['stringValue']
+                try:
+                    cic_id = attributes['cic_id']['stringValue']
+                    start_date = attributes['start_date']['stringValue']
+                    end_date = attributes['end_date']['stringValue']
+                except:
+                    cic_id = attributes['cic_id']['StringValue']
+                    start_date = attributes['start_date']['StringValue']
+                    end_date = attributes['end_date']['StringValue']
 
                 main(cic_id, start_date, end_date)
 
@@ -545,10 +558,11 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
 
     # test data
-    cic_id = "CIC-6e3d2c85-f792-5a06-afc0-a7525487fa4f"
-    start_date = "2023-03-24"
-    end_date = "2023-03-25"
+    cic_id = "CIC-8952410e-96f2-559f-bca6-8df2a36c42a1"
+    start_date = "2023-01-14"
+    end_date = "2023-01-15"
 
     aws_profile = 'nout_prod'
+    MYSQL_TABLE_NAME = '_cic_data_test'
 
     main(cic_id, start_date, end_date, aws_profile)
