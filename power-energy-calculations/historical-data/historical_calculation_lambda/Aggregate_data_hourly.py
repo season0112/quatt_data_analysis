@@ -470,15 +470,15 @@ def calculate_and_aggregate(df):
     df.loc[df['cv_power_output_nonlte'] < 0, 'cv_power_output_nonlte'] = 0
     df['cv_power_output_lte'] = (
         estimate_lte_energy(
-                df[f'qc.cvEnergyCounter'].diff().values,
-                df['timediff[S]'].values,
-                df[f'hp1.thermalEnergyCounter'].values,
+                df['qc.cvEnergyCounter'].diff().values,
+                df['timediff[S]'].fillna(0).values,
+                df['hp1.thermalEnergyCounter'].values,
                 factor=LTE_CV_THERMAL_FACTOR,
                 minimum=0)
     )
     df['cv_power_output'] = np.max([
-        (df[f'hp1_data_availability'].values==0).astype(float) * df['cv_power_output_lte'].values,
-        (df[f'hp1_data_availability'].values>0).astype(float) * df['cv_power_output_nonlte'].values],
+        (df[f'hp1_data_availability'].values==0).astype(float) * df['cv_power_output_lte'].fillna(0).values,
+        (df[f'hp1_data_availability'].values>0).astype(float) * df['cv_power_output_nonlte'].fillna(0).values],
         axis=0
     )
     # df.drop(columns=[f'{hp}.powerOutput_nonlte', f'{hp}.powerOutput_lte'], inplace=True)
