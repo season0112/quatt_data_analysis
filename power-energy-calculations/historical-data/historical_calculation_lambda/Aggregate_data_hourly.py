@@ -382,7 +382,7 @@ def calculate_and_aggregate(df):
                     df[f'qc.{hp}ElectricalEnergyCounter']
                         .fillna(df[f'{hp}.electricalEnergyCounter'])
                         .diff().values,
-                    df['timediff[S]'].fillna(0).values,
+                    df['timediff[S]'].values,
                     df[f'{hp}.electricalEnergyCounter'].values,
                     factor=LTE_HP_ELECTRIC_FACTOR,
                     minimum=LTE_STANDBY_POWER)
@@ -404,7 +404,7 @@ def calculate_and_aggregate(df):
                     df[f'qc.{hp}ThermalEnergyCounter']
                         .fillna(df[f'{hp}.thermalEnergyCounter'])
                         .diff().values,
-                    df['timediff[S]'].fillna(0).values,
+                    df['timediff[S]'].values,
                     df[f'{hp}.thermalEnergyCounter'].values,
                     factor=LTE_HP_THERMAL_FACTOR)
                 )
@@ -471,7 +471,7 @@ def calculate_and_aggregate(df):
     df['cv_power_output_lte'] = (
         estimate_lte_energy(
                 df['qc.cvEnergyCounter'].diff().values,
-                df['timediff[S]'].fillna(0).values,
+                df['timediff[S]'].values,
                 df['hp1.thermalEnergyCounter'].values,
                 factor=LTE_CV_THERMAL_FACTOR,
                 minimum=0)
@@ -645,9 +645,9 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
 
     # test data
-    cic_id = "CIC-13b70628-c3c0-5376-8869-d3f5f98da2d2"
-    start_date = "2022-12-19"
-    end_date = "2022-12-20"
+    cic_id = "CIC-691989e5-24b7-59b9-9807-537c89035f25"
+    start_date = "2023-07-21"
+    end_date = "2023-07-22"
     # cic_id = "CIC-2d7ede19-2738-5cbc-a718-2be1bfda31f9"
     # start_date = "2023-06-01"
     # end_date = "2023-06-02"
