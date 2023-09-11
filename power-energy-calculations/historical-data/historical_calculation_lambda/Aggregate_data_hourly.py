@@ -35,7 +35,7 @@ except Exception as e:
 
 # SETTINGS
 MAX_INTEGRATION_INTERVAL =  900# max interval in seconds for which integration is calculated
-RECALCULATE_HP_HEAT_PRODUCED = False # if True, hp1.powerOuput calculated manually
+RECALCULATE_HP_HEAT_PRODUCED = True # if True, hp1.powerOuput calculated manually
 DENSITY_WATER = 997 # kg/m3
 SPECIFIC_HEAT_WATER = 4182 # J/kg/K
 MYSQL_TABLE_NAME = 'cic_data'
@@ -166,17 +166,17 @@ INTEGRATION_KEYS = {'hp1.energyConsumption':'hp1.powerConsumption',
 def estimate_lte_energy(counter_diff, timediff, new_counter, factor, minimum=None):
     counter_diff_sec = counter_diff * 3600 / timediff
     if minimum:
-        energy_consumption = np.max([np.ones(new_counter.size) * minimum,
+        power_consumption = np.max([np.ones(new_counter.size) * minimum,
                                     # pre 2.x.x software versions
                                     pd.isna(new_counter).astype(float) * factor * counter_diff_sec,
                                     # post 2.x.x software versions
                                     pd.notna(new_counter).astype(float) * counter_diff_sec],
                                     axis=0)
     else:
-        energy_consumption = np.max([pd.isna(new_counter).astype(float) * factor * counter_diff_sec,
+        power_consumption = np.max([pd.isna(new_counter).astype(float) * factor * counter_diff_sec,
                                     pd.notna(new_counter).astype(float) * counter_diff_sec],
                                     axis=0)
-    return energy_consumption
+    return power_consumption
 
 # calculate heat produced
 def hp_heat_produced(flowrate, water_in, water_out):
@@ -379,7 +379,7 @@ def calculate_and_aggregate(df):
         if (df[f'{hp}_data_availability']==0).any():
             df[f'{hp}.powerConsumption_lte'] = (
                 estimate_lte_energy(
-                    df[f'qc.{hp}ElectricalEnergyCounter']
+                    df.sort_values(['cic_id','time.ts'])[f'qc.{hp}ElectricalEnergyCounter']
                         .fillna(df[f'{hp}.electricalEnergyCounter'])
                         .diff().values,
                     df['timediff[S]'].values,
@@ -396,12 +396,12 @@ def calculate_and_aggregate(df):
                     * df[f'{hp}.powerConsumption_nonlte'].fillna(0).values],
                 axis=0
             )
-            df.drop(columns=[f'{hp}.powerConsumption_nonlte', f'{hp}.powerConsumption_lte'], inplace=True)
+            # df.drop(columns=[f'{hp}.powerConsumption_nonlte', f'{hp}.powerConsumption_lte'], inplace=True)
         
             # calculate power output lte
             df[f'{hp}.powerOutput_lte'] = (
                 estimate_lte_energy(
-                    df[f'qc.{hp}ThermalEnergyCounter']
+                    df.sort_values(['cic_id','time.ts'])[f'qc.{hp}ThermalEnergyCounter']
                         .fillna(df[f'{hp}.thermalEnergyCounter'])
                         .diff().values,
                     df['timediff[S]'].values,
@@ -470,7 +470,7 @@ def calculate_and_aggregate(df):
     df.loc[df['cv_power_output_nonlte'] < 0, 'cv_power_output_nonlte'] = 0
     df['cv_power_output_lte'] = (
         estimate_lte_energy(
-                df['qc.cvEnergyCounter'].diff().values,
+                df.sort_values(['cic_id','time.ts'])['qc.cvEnergyCounter'].diff().values,
                 df['timediff[S]'].values,
                 df['hp1.thermalEnergyCounter'].values,
                 factor=LTE_CV_THERMAL_FACTOR,
@@ -645,15 +645,15 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
 
     # test data
-    cic_id = "CIC-691989e5-24b7-59b9-9807-537c89035f25"
-    start_date = "2023-07-21"
-    end_date = "2023-07-22"
+    cic_id = "CIC-7ae852d0-e341-579e-8eac-b058eb6e368a"
+    start_date = "2023-04-26"
+    end_date = "2023-04-27"
     # cic_id = "CIC-2d7ede19-2738-5cbc-a718-2be1bfda31f9"
     # start_date = "2023-06-01"
     # end_date = "2023-06-02"
 
 
     aws_profile = 'nout_prod'
-    MYSQL_TABLE_NAME = '_cic_data_test'
+    MYSQL_TABLE_NAME = '_test_cic_data'
 
     main(cic_id, start_date, end_date, aws_profile)
