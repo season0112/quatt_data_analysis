@@ -379,7 +379,7 @@ def calculate_and_aggregate(df):
         if (df[f'{hp}_data_availability']==0).any():
             df[f'{hp}.powerConsumption_lte'] = (
                 estimate_lte_energy(
-                    df.sort_values(['cic_id','time.ts'])[f'qc.{hp}ElectricalEnergyCounter']
+                    df[f'qc.{hp}ElectricalEnergyCounter']
                         .fillna(df[f'{hp}.electricalEnergyCounter'])
                         .diff().values,
                     df['timediff[S]'].values,
@@ -401,7 +401,7 @@ def calculate_and_aggregate(df):
             # calculate power output lte
             df[f'{hp}.powerOutput_lte'] = (
                 estimate_lte_energy(
-                    df.sort_values(['cic_id','time.ts'])[f'qc.{hp}ThermalEnergyCounter']
+                    df[f'qc.{hp}ThermalEnergyCounter']
                         .fillna(df[f'{hp}.thermalEnergyCounter'])
                         .diff().values,
                     df['timediff[S]'].values,
@@ -470,7 +470,7 @@ def calculate_and_aggregate(df):
     df.loc[df['cv_power_output_nonlte'] < 0, 'cv_power_output_nonlte'] = 0
     df['cv_power_output_lte'] = (
         estimate_lte_energy(
-                df.sort_values(['cic_id','time.ts'])['qc.cvEnergyCounter'].diff().values,
+                df['qc.cvEnergyCounter'].diff().values,
                 df['timediff[S]'].values,
                 df['hp1.thermalEnergyCounter'].values,
                 factor=LTE_CV_THERMAL_FACTOR,
@@ -595,6 +595,8 @@ def main(cic_id, start_date, end_date, aws_profile=""):
     else:
         # de-duplicate dataframe
         extract_df = extract_df.drop_duplicates(subset=['time.ts'], keep='first')
+        # re-order based on timestamp
+        extract_df = extract_df.sort_values(by=['cic_id','time.ts'])
 
     # calculate and aggregate data
     try:
@@ -645,15 +647,15 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
 
     # test data
-    cic_id = "CIC-7ae852d0-e341-579e-8eac-b058eb6e368a"
-    start_date = "2023-04-26"
-    end_date = "2023-04-27"
+    cic_id = "CIC-9bfe71f8-8749-56a7-816c-c290df324855"
+    start_date = "2023-05-06"
+    end_date = "2023-05-07"
     # cic_id = "CIC-2d7ede19-2738-5cbc-a718-2be1bfda31f9"
     # start_date = "2023-06-01"
     # end_date = "2023-06-02"
 
 
     aws_profile = 'nout_prod'
-    MYSQL_TABLE_NAME = '_test_cic_data'
+    MYSQL_TABLE_NAME = 'cic_data'
 
     main(cic_id, start_date, end_date, aws_profile)
