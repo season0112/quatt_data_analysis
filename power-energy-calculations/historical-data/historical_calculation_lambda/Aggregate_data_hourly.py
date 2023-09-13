@@ -271,7 +271,8 @@ def estimate_energy_consumption(powerInput,
                           + (150.06430841218332 * bottomPlateHeaterEnable)
                           + (circulatingPumpDutyCycle * circulatingPumpRelay)
                           + (40 * crankcaseHeater))
-    return energy_consumption
+    # set a lower limit at 0
+    return np.where(energy_consumption<0, 0, energy_consumption)
 
 def integrate_data(df, keys):
     for key, value in zip(keys.keys(), keys.values()):
@@ -647,9 +648,9 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
 
     # test data
-    cic_id = "CIC-9bfe71f8-8749-56a7-816c-c290df324855"
-    start_date = "2023-05-06"
-    end_date = "2023-05-07"
+    cic_id = "CIC-4d5ecd4f-f1c7-5f02-bd6d-ae974808bd6e"
+    start_date = "2023-04-22"
+    end_date = "2023-04-23"
     # cic_id = "CIC-2d7ede19-2738-5cbc-a718-2be1bfda31f9"
     # start_date = "2023-06-01"
     # end_date = "2023-06-02"
