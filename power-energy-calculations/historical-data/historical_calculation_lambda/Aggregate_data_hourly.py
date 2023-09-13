@@ -108,7 +108,8 @@ S3_PROPERTIES = {
                     'quattBuild',
                     'hp1Connected',
                     'hp2Connected',
-                    'modbusConnected'],
+                    'modbusConnected',
+                    'isModbusDriverAlive'],
          'qc': ['hp1PowerOutput',
                 'hp1ElectricalEnergyCounter',
                 'hp2ElectricalEnergyCounter',
@@ -433,6 +434,8 @@ def calculate_and_aggregate(df):
         # set power consumption and production to zero where heat pump is disconnected
         df.loc[df[f'system.{hp}Connected'].fillna(True)==False,
                [f'{hp}.powerConsumption', f'{hp}.powerOutput']] = 0
+        df.loc[df['system.isModbusDriverAlive']==False,
+                [f'{hp}.powerConsumption', f'{hp}.powerOutput']] = 0
 
     # get hp1 power output
     if RECALCULATE_HP_HEAT_PRODUCED:
@@ -445,6 +448,7 @@ def calculate_and_aggregate(df):
         # set power output to zero where heat pump is disconnected
         df.loc[df['system.hp1Connected'].fillna(True)==False,
                ['hp1.powerOutput']] = 0
+        df.loc[df['system.isModbusDriverAlive']==False,'hp1.powerOutput'] = 0
         # set output to zero where supervisoryControlMode is not 2 or 3
         df.loc[df['qc.supervisoryControlMode'].fillna(0).isin([2,3])==False,
                 ['hp1.powerOutput']] = 0
@@ -486,6 +490,7 @@ def calculate_and_aggregate(df):
 
     df.loc[df['system.hp2Connected'].fillna(df['system.hp1Connected'])==False,
            'cv_power_output'] = 0 # see END-283
+    df.loc[df['system.isModbusDriverAlive']==False,'cv_power_output'] = 0 # 
     df['cvActive'] = df['qc.supervisoryControlMode'].isin([3,4]).astype(float)
 
     # merge energy counters
@@ -648,9 +653,9 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
 
     # test data
-    cic_id = "CIC-4d5ecd4f-f1c7-5f02-bd6d-ae974808bd6e"
-    start_date = "2023-04-22"
-    end_date = "2023-04-23"
+    cic_id = "CIC-639e8a1b-4005-5f2a-bbd9-06b626d29607"
+    start_date = "2023-07-25"
+    end_date = "2023-07-26"
     # cic_id = "CIC-2d7ede19-2738-5cbc-a718-2be1bfda31f9"
     # start_date = "2023-06-01"
     # end_date = "2023-06-02"
