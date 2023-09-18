@@ -35,7 +35,7 @@ except Exception as e:
 
 # SETTINGS
 MAX_INTEGRATION_INTERVAL =  900# max interval in seconds for which integration is calculated
-RECALCULATE_HP_HEAT_PRODUCED = False # if True, hp1.powerOuput calculated manually
+RECALCULATE_HP_HEAT_PRODUCED = True # if True, hp1.powerOuput calculated manually
 DENSITY_WATER = 997 # kg/m3
 SPECIFIC_HEAT_WATER = 4182 # J/kg/K
 MYSQL_TABLE_NAME = 'cic_data'
@@ -108,7 +108,8 @@ S3_PROPERTIES = {
                     'quattBuild',
                     'hp1Connected',
                     'hp2Connected',
-                    'modbusConnected'],
+                    'modbusConnected',
+                    'isModbusDriverAlive'],
          'qc': ['hp1PowerOutput',
                 'hp1ElectricalEnergyCounter',
                 'hp2ElectricalEnergyCounter',
@@ -166,17 +167,17 @@ INTEGRATION_KEYS = {'hp1.energyConsumption':'hp1.powerConsumption',
 def estimate_lte_energy(counter_diff, timediff, new_counter, factor, minimum=None):
     counter_diff_sec = counter_diff * 3600 / timediff
     if minimum:
-        energy_consumption = np.max([np.ones(new_counter.size) * minimum,
+        power_consumption = np.max([np.ones(new_counter.size) * minimum,
                                     # pre 2.x.x software versions
                                     pd.isna(new_counter).astype(float) * factor * counter_diff_sec,
                                     # post 2.x.x software versions
                                     pd.notna(new_counter).astype(float) * counter_diff_sec],
                                     axis=0)
     else:
-        energy_consumption = np.max([pd.isna(new_counter).astype(float) * factor * counter_diff_sec,
+        power_consumption = np.max([pd.isna(new_counter).astype(float) * factor * counter_diff_sec,
                                     pd.notna(new_counter).astype(float) * counter_diff_sec],
                                     axis=0)
-    return energy_consumption
+    return power_consumption
 
 # calculate heat produced
 def hp_heat_produced(flowrate, water_in, water_out):
@@ -271,7 +272,8 @@ def estimate_energy_consumption(powerInput,
                           + (150.06430841218332 * bottomPlateHeaterEnable)
                           + (circulatingPumpDutyCycle * circulatingPumpRelay)
                           + (40 * crankcaseHeater))
-    return energy_consumption
+    # set a lower limit at 0
+    return np.where(energy_consumption<0, 0, energy_consumption)
 
 def integrate_data(df, keys):
     for key, value in zip(keys.keys(), keys.values()):
@@ -382,7 +384,7 @@ def calculate_and_aggregate(df):
                     df[f'qc.{hp}ElectricalEnergyCounter']
                         .fillna(df[f'{hp}.electricalEnergyCounter'])
                         .diff().values,
-                    df['timediff[S]'].fillna(0).values,
+                    df['timediff[S]'].values,
                     df[f'{hp}.electricalEnergyCounter'].values,
                     factor=LTE_HP_ELECTRIC_FACTOR,
                     minimum=LTE_STANDBY_POWER)
@@ -396,7 +398,7 @@ def calculate_and_aggregate(df):
                     * df[f'{hp}.powerConsumption_nonlte'].fillna(0).values],
                 axis=0
             )
-            df.drop(columns=[f'{hp}.powerConsumption_nonlte', f'{hp}.powerConsumption_lte'], inplace=True)
+            # df.drop(columns=[f'{hp}.powerConsumption_nonlte', f'{hp}.powerConsumption_lte'], inplace=True)
         
             # calculate power output lte
             df[f'{hp}.powerOutput_lte'] = (
@@ -404,7 +406,7 @@ def calculate_and_aggregate(df):
                     df[f'qc.{hp}ThermalEnergyCounter']
                         .fillna(df[f'{hp}.thermalEnergyCounter'])
                         .diff().values,
-                    df['timediff[S]'].fillna(0).values,
+                    df['timediff[S]'].values,
                     df[f'{hp}.thermalEnergyCounter'].values,
                     factor=LTE_HP_THERMAL_FACTOR)
                 )
@@ -432,6 +434,8 @@ def calculate_and_aggregate(df):
         # set power consumption and production to zero where heat pump is disconnected
         df.loc[df[f'system.{hp}Connected'].fillna(True)==False,
                [f'{hp}.powerConsumption', f'{hp}.powerOutput']] = 0
+        df.loc[df['system.isModbusDriverAlive']==False,
+                [f'{hp}.powerConsumption', f'{hp}.powerOutput']] = 0
 
     # get hp1 power output
     if RECALCULATE_HP_HEAT_PRODUCED:
@@ -444,6 +448,7 @@ def calculate_and_aggregate(df):
         # set power output to zero where heat pump is disconnected
         df.loc[df['system.hp1Connected'].fillna(True)==False,
                ['hp1.powerOutput']] = 0
+        df.loc[df['system.isModbusDriverAlive']==False,'hp1.powerOutput'] = 0
         # set output to zero where supervisoryControlMode is not 2 or 3
         df.loc[df['qc.supervisoryControlMode'].fillna(0).isin([2,3])==False,
                 ['hp1.powerOutput']] = 0
@@ -470,21 +475,22 @@ def calculate_and_aggregate(df):
     df.loc[df['cv_power_output_nonlte'] < 0, 'cv_power_output_nonlte'] = 0
     df['cv_power_output_lte'] = (
         estimate_lte_energy(
-                df[f'qc.cvEnergyCounter'].diff().values,
+                df['qc.cvEnergyCounter'].diff().values,
                 df['timediff[S]'].values,
-                df[f'hp1.thermalEnergyCounter'].values,
+                df['hp1.thermalEnergyCounter'].values,
                 factor=LTE_CV_THERMAL_FACTOR,
                 minimum=0)
     )
     df['cv_power_output'] = np.max([
-        (df[f'hp1_data_availability'].values==0).astype(float) * df['cv_power_output_lte'].values,
-        (df[f'hp1_data_availability'].values>0).astype(float) * df['cv_power_output_nonlte'].values],
+        (df[f'hp1_data_availability'].values==0).astype(float) * df['cv_power_output_lte'].fillna(0).values,
+        (df[f'hp1_data_availability'].values>0).astype(float) * df['cv_power_output_nonlte'].fillna(0).values],
         axis=0
     )
     # df.drop(columns=[f'{hp}.powerOutput_nonlte', f'{hp}.powerOutput_lte'], inplace=True)
 
     df.loc[df['system.hp2Connected'].fillna(df['system.hp1Connected'])==False,
            'cv_power_output'] = 0 # see END-283
+    df.loc[df['system.isModbusDriverAlive']==False,'cv_power_output'] = 0 # 
     df['cvActive'] = df['qc.supervisoryControlMode'].isin([3,4]).astype(float)
 
     # merge energy counters
@@ -595,6 +601,8 @@ def main(cic_id, start_date, end_date, aws_profile=""):
     else:
         # de-duplicate dataframe
         extract_df = extract_df.drop_duplicates(subset=['time.ts'], keep='first')
+        # re-order based on timestamp
+        extract_df = extract_df.sort_values(by=['cic_id','time.ts'])
 
     # calculate and aggregate data
     try:
@@ -645,15 +653,15 @@ def lambda_handler(event, context):
 if __name__ == "__main__":
 
     # test data
-    cic_id = "CIC-13b70628-c3c0-5376-8869-d3f5f98da2d2"
-    start_date = "2022-12-19"
-    end_date = "2022-12-20"
+    cic_id = "CIC-639e8a1b-4005-5f2a-bbd9-06b626d29607"
+    start_date = "2023-07-25"
+    end_date = "2023-07-26"
     # cic_id = "CIC-2d7ede19-2738-5cbc-a718-2be1bfda31f9"
     # start_date = "2023-06-01"
     # end_date = "2023-06-02"
 
 
     aws_profile = 'nout_prod'
-    MYSQL_TABLE_NAME = '_cic_data_test'
+    MYSQL_TABLE_NAME = 'cic_data'
 
     main(cic_id, start_date, end_date, aws_profile)

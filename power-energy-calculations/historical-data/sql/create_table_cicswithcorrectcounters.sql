@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS `_cicsWithSoftwareVersion208` (
+CREATE TABLE IF NOT EXISTS `_cicsWithCorrectCounters` (
     `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     `cic_id` CHAR(40) NOT NULL check(cic_id REGEXP 'CIC-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'),
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
