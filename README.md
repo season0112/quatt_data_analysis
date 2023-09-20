@@ -8,7 +8,7 @@ Contains short examples for getting data from redis / mysql / cloudwatch.
 @Dhruv can you add a short description?
 
 ## power-energy-calculations
-Setting up a model to recalculate historical counters and measuring the accuracy of this model.
+Goal: Setting up a model to recalculate historical counters and measuring the accuracy of this model.
 
 ### data
 Data files that were saved in used in the analysis.
