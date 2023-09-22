@@ -1,11 +1,14 @@
 # quatt_data_analysis
 This repository contains several data analytics scripts and results, all in Python / Jupyter Notebook.
 
+## customer-issues
+Data analysis related to various customer issues, either reported via customer service or detected from the various dashboards.
+
 ## Other
 Contains short examples for getting data from redis / mysql / cloudwatch.
 
 ## offline-cics
-@Dhruv can you add a short description?
+Contains an analysis of the connectivity statuses of CiC's in the installed base with respect to Quatt AWS cloud and Mender cloud.
 
 ## power-energy-calculations
 Goal: Setting up a model to recalculate historical counters and measuring the accuracy of this model.
@@ -25,7 +28,10 @@ Data files that were saved in used in the analysis.
 - TBD: place rest of scripts in other repository
 
 ## refurb issues
+Analysis of CiCs that may have been incorrectly refurbished in the cloud (i.e., data was accidently deleted).
 
 ## silent-mode-mismatch
+Analysis of installations for which the silent mode setting in the CiC does not match the silent mode setting in the cloud due to incorrect default setting during migration of silent mode setting to production
 
 ## wilo-pump-test
+Test scripts used to test the Wilo pump and the associated test data
