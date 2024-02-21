@@ -59,3 +59,6 @@ Analysis of installations for which the silent mode setting in the CiC does not 
 
 ### wilo-pump-test
 Test scripts used to test the Wilo pump and the associated test data
+
+## Test data in production
+Before each analysis make sure to check [this sheet](https://docs.google.com/spreadsheets/d/170q_-Qxdcddj69vHCYtmeCo2Gb-KSEnt7WJJAc5BEgw/edit#gid=0) to see what testing data in production might interfere with your analysis.
