@@ -36,8 +36,11 @@ Contains short examples for getting data from redis / mysql / cloudwatch.
 
 ### power-energy-calculations
 Goal: Setting up a model to recalculate historical counters and measuring the accuracy of this model.
+Detailed documentation on Slite: 
+- Final model for historical energy consumption: [Final Model](https://quatt.slite.com/app/docs/JEG8lRg5Jlkz_T/Calculation-model-or-energy-consumption-production)
+- Documentation about accuracy of metrics: [Metric Accuracy](https://quatt.slite.com/app/docs/-MfmJZxR1-IB_J/Accuracy-of-data-metrics)
 
-### data
+#### data
 Data files that were saved in used in the analysis.
 
 #### live-data
@@ -49,7 +52,6 @@ Data files that were saved in used in the analysis.
 #### historical-data
 - Extends on the live-data model with a model to replace the `bottomPlateHeaterEnable` parameter when this is not available.
 - Extends on the live-data model with a model to replace the model when non of the above inputs are available (LTE mode).
-- TBD: place rest of scripts in other repository
 
 ### refurb issues
 Analysis of CiCs that may have been incorrectly refurbished in the cloud (i.e., data was accidently deleted).
@@ -59,6 +61,7 @@ Analysis of installations for which the silent mode setting in the CiC does not 
 
 ### wilo-pump-test
 Test scripts used to test the Wilo pump and the associated test data
+
 
 ## Test data in production
 Before each analysis make sure to check [this sheet](https://docs.google.com/spreadsheets/d/170q_-Qxdcddj69vHCYtmeCo2Gb-KSEnt7WJJAc5BEgw/edit#gid=0) to see what testing data in production might interfere with your analysis.
